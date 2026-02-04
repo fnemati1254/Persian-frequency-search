@@ -10,15 +10,24 @@
   <style>
     body {
       font-family: sans-serif;
-      max-width: 800px;
+      max-width: 900px;
       margin: 2rem auto;
       line-height: 1.6;
       direction: rtl;
     }
-    input {
+    input, textarea, button {
       width: 100%;
-      padding: 0.7rem;
-      font-size: 1.2rem;
+      padding: 0.6rem;
+      font-size: 1rem;
+      margin-top: 0.4rem;
+    }
+    textarea {
+      resize: vertical;
+    }
+    button {
+      cursor: pointer;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
     }
     table {
       width: 100%;
@@ -38,10 +47,14 @@
       font-size: 0.9rem;
       margin-top: 0.5rem;
     }
+    hr {
+      margin: 2rem 0;
+    }
   </style>
 </head>
 
 <body>
+
   <h2>🔍 جستجوی بسامد واژه‌های فارسی</h2>
 
   <p class="note">
@@ -70,6 +83,28 @@
     </thead>
     <tbody></tbody>
   </table>
+
+  <hr>
+
+  <h3>📄 محاسبهٔ بسامد برای فایل یا فهرست واژه‌ها</h3>
+
+  <p class="note">
+    هر واژه را در یک خط بنویسید یا یک فایل متنی فارسی بارگذاری کنید.
+  </p>
+
+  <textarea
+    id="wordList"
+    rows="6"
+    placeholder="مثال:
+کتاب
+مدرسه
+دانشجو
+هوش مصنوعی"
+  ></textarea>
+
+  <input type="file" id="fileInput" accept=".txt">
+
+  <button id="analyzeBtn">محاسبهٔ بسامد</button>
 
   <script src="apps.js"></script>
 </body>
