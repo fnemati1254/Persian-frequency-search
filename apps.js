@@ -41,7 +41,11 @@ fetch("word_frequencies_public.tsv")
       minMatchCharLength: 2
     });
 
-    document.getElementById("status").textContent = "آمادهٔ جستجو";
+    const status = document.getElementById("status");
+        status.textContent = "آمادهٔ جستجو";
+        setTimeout(() => {
+        status.style.display = "none";
+        }, 800);
   });
 
 // رویداد جستجو
@@ -70,3 +74,4 @@ document.getElementById("searchBox").addEventListener("input", e => {
     tbody.appendChild(row);
   }
 });
+
