@@ -1,10 +1,13 @@
 let words = [];
 let fuse = null;
 let freqMap = {};
-let lastResults = []; // برای خروجی Excel
+let lastResults = [];
 
-// نرمال‌سازی املایی فارسی
-function normalize(text) {
+// نویسه‌های خاص فارسی
+const ZWNJ = "\u200c";
+
+// نرمال‌سازی پایه
+function normalizeBase(text) {
   return text
     .replace(/ك/g, "ک")
     .replace(/ي/g, "ی")
@@ -14,31 +17,40 @@ function normalize(text) {
     .trim();
 }
 
-// بارگذاری فایل TSV
+// تولید همهٔ واریانت‌های ممکن فاصله‌ای
+function generateVariants(word) {
+  const base = normalizeBase(word);
+
+  return new Set([
+    base,
+    base.replaceAll(ZWNJ, " "),
+    base.replaceAll(" ", ZWNJ),
+    base.replaceAll(" ", ""),
+    base.replaceAll(ZWNJ, ""),
+    base.replaceAll(ZWNJ, "").replaceAll(" ", "")
+  ]);
+}
+
+// بارگذاری داده‌ها
 fetch("word_frequencies_public.tsv")
   .then(res => res.text())
   .then(text => {
     const lines = text.trim().split("\n");
 
-    // هدر: Word\tPerMillion\tZipf
     for (let i = 1; i < lines.length; i++) {
-      const parts = lines[i].split("\t");
-      if (parts.length < 3) continue;
+      const [word, pm, zipf] = lines[i].split("\t");
+      if (!word) continue;
 
-      const item = {
-        word: parts[0],
-        norm: normalize(parts[0]),
-        pm: parts[1],
-        zipf: parts[2]
-      };
+      const norm = normalizeBase(word);
+      const item = { word, pm, zipf };
 
-      words.push(item);
-      freqMap[item.norm] = item;
+      words.push({ ...item, norm });
+      freqMap[norm] = item;
     }
 
     fuse = new Fuse(words, {
       keys: ["norm"],
-      threshold: 0.25,
+      threshold: 0.3,
       minMatchCharLength: 2
     });
 
@@ -47,7 +59,7 @@ fetch("word_frequencies_public.tsv")
     setTimeout(() => status.style.display = "none", 800);
   });
 
-// رندر جدول و ذخیرهٔ نتایج
+// رندر جدول
 function renderResults(items) {
   const tbody = document.querySelector("#results tbody");
   tbody.innerHTML = "";
@@ -57,8 +69,8 @@ function renderResults(items) {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.word}</td>
-      <td>${item.pm !== "—" ? parseFloat(item.pm).toFixed(3) : "—"}</td>
-      <td>${item.zipf !== "—" ? parseFloat(item.zipf).toFixed(3) : "—"}</td>
+      <td>${item.pm !== "—" ? Number(item.pm).toFixed(3) : "—"}</td>
+      <td>${item.zipf !== "—" ? Number(item.zipf).toFixed(3) : "—"}</td>
     `;
     tbody.appendChild(row);
   }
@@ -66,26 +78,31 @@ function renderResults(items) {
 
 // جستجوی تعاملی
 document.getElementById("searchBox").addEventListener("input", e => {
-  const query = normalize(e.target.value);
+  const query = normalizeBase(e.target.value);
   if (!query || !fuse) return;
 
-  let results = fuse.search(query, { limit: 50 }).map(r => r.item);
-  results.sort((a, b) => parseFloat(b.pm) - parseFloat(a.pm));
+  const results = fuse.search(query, { limit: 50 })
+    .map(r => r.item)
+    .sort((a, b) => b.pm - a.pm);
+
   renderResults(results);
 });
 
-// پردازش فهرست یا فایل
+// پردازش متن یا فایل
 function processText(text) {
   const lines = text
     .split(/\r?\n/)
-    .map(w => normalize(w))
-    .filter(w => w.length > 0);
+    .map(w => w.trim())
+    .filter(Boolean);
 
-  const results = lines.map(w => {
-    const item = freqMap[w];
-    return item
-      ? item
-      : { word: w, pm: "—", zipf: "—" };
+  const results = lines.map(inputWord => {
+    const variants = generateVariants(inputWord);
+
+    for (const v of variants) {
+      if (freqMap[v]) return freqMap[v];
+    }
+
+    return { word: inputWord, pm: "—", zipf: "—" };
   });
 
   renderResults(results);
@@ -97,7 +114,7 @@ document.getElementById("analyzeBtn").addEventListener("click", () => {
   if (text.trim()) processText(text);
 });
 
-// فایل متنی (اولویت با فایل)
+// فایل متنی
 document.getElementById("fileInput").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
@@ -109,9 +126,12 @@ document.getElementById("fileInput").addEventListener("change", e => {
   reader.readAsText(file, "utf-8");
 });
 
-// 🔽 خروجی Excel (CSV با UTF-8 BOM)
+// خروجی Excel (UTF-8 BOM)
 document.getElementById("exportBtn").addEventListener("click", () => {
-  if (!lastResults.length) return alert("هیچ نتیجه‌ای برای خروجی وجود ندارد.");
+  if (!lastResults.length) {
+    alert("هیچ داده‌ای برای خروجی وجود ندارد.");
+    return;
+  }
 
   let csv = "\uFEFFواژه,بسامد در میلیون,Zipf\n";
   for (const r of lastResults) {
@@ -124,8 +144,7 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   const a = document.createElement("a");
   a.href = url;
   a.download = "persian_word_frequencies.csv";
-  document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+
   URL.revokeObjectURL(url);
 });
