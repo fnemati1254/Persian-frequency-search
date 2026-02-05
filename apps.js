@@ -497,6 +497,9 @@
 
     // analyze list/file
     btnAnalyze.addEventListener("click", async () => {
+      // Clear search input to prevent mixing results
+      searchInput.value = "";
+      
       // Clear previous results first
       setResults([]);
       setStatus("در حال پردازش...");
@@ -546,7 +549,7 @@
       }
 
       setResults(rows);
-      setStatus(`تحلیل انجام شد: ${rows.length} واژه (آخرین نتایج نمایش داده می‌شود).`);
+      setStatus(`تحلیل انجام شد: ${rows.length} واژه`);
     });
 
     // load data
