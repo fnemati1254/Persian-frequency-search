@@ -25,7 +25,7 @@
     return s;
   }
 
-  // Generate multiple match keys (space/zwnj + آ/ا variants)
+  // generate multiple match keys (space/zwnj + آ/ا variants)
   function buildMatchKeys(rawWord) {
     const w = normalizePersian(rawWord);
     if (!w) return [];
@@ -35,20 +35,36 @@
     const noSpaceNoZwnj = noSpaces.replaceAll(ZWNJ, "");
     const spaceToZwnj = w.replace(/\s+/g, ZWNJ);
 
+    // آ/ا variants (to reduce mismatch)
     const a2alef = (x) => x.replace(/آ/g, "ا");
+    const alef2a = (x) => x.replace(/\bا/g, "آ"); // conservative
 
     const base = [w, noSpaces, noZwnj, noSpaceNoZwnj, spaceToZwnj];
-    const extra = base.map(a2alef);
 
-    const keys = [...base, ...extra].map((x) => x.trim()).filter(Boolean);
+    const extra = [];
+    for (const b of base) {
+      extra.push(a2alef(b));
+      extra.push(alef2a(b));
+    }
+
+    const keys = [...base, ...extra].map(x => x.trim()).filter(Boolean);
     return [...new Set(keys)];
+  }
+
+  // ✅ SPEED: keys سریع‌تر فقط برای تحلیل فایل/لیست (نه سرچ زنده)
+  function buildMatchKeysFast(wNorm) {
+    const noSpaces = wNorm.replace(/\s+/g, "");
+    const noZwnj = wNorm.replaceAll(ZWNJ, "");
+    const a2alef = (x) => x.replace(/آ/g, "ا");
+    // variant‌های کم ولی مؤثر
+    return [...new Set([wNorm, noSpaces, noZwnj, a2alef(wNorm), a2alef(noSpaces), a2alef(noZwnj)])];
   }
 
   // ---------- CSV/TSV parsing ----------
   function parseTSV(text) {
     text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
-    return lines.map((l) => l.split("\t"));
+    const lines = text.split("\n").filter(l => l.trim().length > 0);
+    return lines.map(l => l.split("\t"));
   }
 
   function parseCSV(text) {
@@ -86,15 +102,15 @@
 
   function pickIndex(map, candidates) {
     for (const c of candidates) {
-      const k = String(c).toLowerCase();
+      const k = c.toLowerCase();
       if (map.has(k)) return map.get(k);
     }
     return -1;
   }
 
   // ---------- Data stores ----------
-  let freqMap = new Map(); // key -> {word, perMillion, zipf}
-  let vadMap = new Map();  // key -> {source,valence,arousal,dominance,concreteness}
+  let freqMap = new Map(); // key-> {word, perMillion, zipf}
+  let vadMap  = new Map(); // key-> {source,valence,arousal,dominance,concreteness}
 
   // Search index buckets (first char -> array of canonical words)
   let freqBuckets = new Map();
@@ -113,11 +129,11 @@
   function getSelectedAffectCols() {
     const checks = document.querySelectorAll(".affectChk");
     const selected = [];
-    checks.forEach((chk) => { if (chk.checked) selected.push(chk.value); });
+    checks.forEach(chk => { if (chk.checked) selected.push(chk.value); });
     return selected;
   }
 
-  function fmtNum(x, digits = 3) {
+  function fmtNum(x, digits=3) {
     if (x == null || x === "" || Number.isNaN(x)) return "—";
     const n = Number(x);
     if (!Number.isFinite(n)) return "—";
@@ -137,11 +153,11 @@
       { key: "word", label: "واژه" },
       { key: "perMillion", label: "بسامد در میلیون (Per Million)" },
       { key: "zipf", label: "زیف (Zipf)" },
-      ...affectCols.map((c) => ({ key: c, label: c[0].toUpperCase() + c.slice(1) })),
+      ...affectCols.map(c => ({ key: c, label: c[0].toUpperCase() + c.slice(1) })),
       { key: "affectSource", label: "Affect_Source" }
     ];
 
-    head.innerHTML = "<tr>" + cols.map((c) => `<th>${c.label}</th>`).join("") + "</tr>";
+    head.innerHTML = "<tr>" + cols.map(c => `<th>${c.label}</th>`).join("") + "</tr>";
 
     const show = lastResults.slice(0, displayLimit);
     body.innerHTML = "";
@@ -175,7 +191,7 @@
 
     for (const k of keys) {
       if (!freq && freqMap.has(k)) freq = freqMap.get(k);
-      if (!vad && vadMap.has(k)) vad = vadMap.get(k);
+      if (!vad  && vadMap.has(k))  vad  = vadMap.get(k);
       if (freq && vad) break;
     }
 
@@ -194,11 +210,35 @@
     };
   }
 
+  // ✅ SPEED: lookup سریع فقط برای batch (ورودی از قبل normalize شده)
+  function lookupOneNormalizedFast(wNorm) {
+    const keys = buildMatchKeysFast(wNorm);
+    let freq = null, vad = null;
+
+    for (const k of keys) {
+      if (!freq && freqMap.has(k)) freq = freqMap.get(k);
+      if (!vad  && vadMap.has(k))  vad  = vadMap.get(k);
+      if (freq && vad) break;
+    }
+
+    return {
+      word: wNorm,
+      perMillion: freq?.perMillion ?? null,
+      zipf: freq?.zipf ?? null,
+      valence: vad?.valence ?? null,
+      arousal: vad?.arousal ?? null,
+      dominance: vad?.dominance ?? null,
+      concreteness: vad?.concreteness ?? null,
+      affectSource: vad?.source ?? null,
+      _hasAny: !!(freq || vad)
+    };
+  }
+
   // ---------- Bucket indexing ----------
   function bucketKey(word) {
     const w = normalizePersian(word);
     if (!w) return "#";
-    return w[0]; // first char
+    return w[0];
   }
 
   function addToBucket(buckets, word) {
@@ -207,7 +247,7 @@
     buckets.get(k).push(word);
   }
 
-  // Search using buckets (fast)
+  // Search using buckets (NO limited scanning)
   function searchWords(query) {
     const q = normalizePersian(query);
     if (!q) return [];
@@ -226,12 +266,11 @@
       ...Array.from(vadBuckets.values()).flat()
     ];
 
-    // Rank: exact > startsWith > includes, then zipf
-    const WANT = 500;
+    const WANT = 300;
     const out = [];
     const seen = new Set();
 
-    function rankWord(w) {
+    function rank(w) {
       const wn = normalizePersian(w);
       const exact = (wn === q || wn === qCompact) ? 3 : 0;
       const starts = (wn.startsWith(q) || wn.startsWith(qCompact)) ? 2 : 0;
@@ -260,8 +299,8 @@
     }
 
     out.sort((a, b) => {
-      const ra = rankWord(a.word);
-      const rb = rankWord(b.word);
+      const ra = rank(a.word);
+      const rb = rank(b.word);
       if (rb !== ra) return rb - ra;
       const za = (typeof a.zipf === "number") ? a.zipf : -999;
       const zb = (typeof b.zipf === "number") ? b.zipf : -999;
@@ -290,13 +329,13 @@
         r.word ?? "",
         r.perMillion ?? "",
         r.zipf ?? "",
-        ...affectCols.map((c) => (r[c] ?? "")),
+        ...affectCols.map(c => (r[c] ?? "")),
         r.affectSource ?? ""
       ].map(escape).join(",");
       lines.push(line);
     }
 
-    return "\uFEFF" + lines.join("\n"); // BOM
+    return "\uFEFF" + lines.join("\n");
   }
 
   function downloadCSV() {
@@ -323,9 +362,8 @@
 
     const header = rows[0];
     const map = headerIndexMap(header);
-
     const iWord = pickIndex(map, ["word", "token", "w"]);
-    const iPerM = pickIndex(map, ["per_million", "permillion", "per million", "per_million_freq"]);
+    const iPerM = pickIndex(map, ["per_million", "permillion", "per million"]);
     const iZipf = pickIndex(map, ["zipf"]);
 
     if (iWord < 0) throw new Error("Frequency TSV: header 'word' not found.");
@@ -358,9 +396,6 @@
     }
   }
 
-  // IMPORTANT FIX:
-  // Your vad_data.csv columns are:
-  // word,dataset,valence,arousal,dominance,concrete,EBW_V,EBW_A,EBW_D,EBW_C,...
   async function loadVAD() {
     const res = await fetch("vad_data.csv", { cache: "no-store" });
     if (!res.ok) throw new Error("Cannot load vad_data.csv");
@@ -372,28 +407,16 @@
 
     const iWord = pickIndex(map, ["word"]);
     const iDataset = pickIndex(map, ["dataset"]);
-
-    // Human
     const iV = pickIndex(map, ["valence"]);
     const iA = pickIndex(map, ["arousal"]);
     const iD = pickIndex(map, ["dominance"]);
-    // In your file it is "concrete" (NOT "concreteness")
-    const iC = pickIndex(map, ["concrete", "concreteness"]);
-
-    // Extrapolated (EBW) - in your file they are EBW_V / EBW_A / EBW_D / EBW_C
-    const iEV = pickIndex(map, ["ebw_v", "ebw_valence", "ebwvalence", "ebw_val"]);
-    const iEA = pickIndex(map, ["ebw_a", "ebw_arousal", "ebwarousal", "ebw_aro"]);
-    const iED = pickIndex(map, ["ebw_d", "ebw_dominance", "ebwdominance", "ebw_dom"]);
-    const iEC = pickIndex(map, ["ebw_c", "ebw_concreteness", "ebwconcreteness", "ebw_con"]);
+    const iC = pickIndex(map, ["concreteness"]);
+    const iEV = pickIndex(map, ["ebw_valence"]);
+    const iEA = pickIndex(map, ["ebw_arousal"]);
+    const iED = pickIndex(map, ["ebw_dominance"]);
+    const iEC = pickIndex(map, ["ebw_concreteness"]);
 
     if (iWord < 0 || iDataset < 0) throw new Error("VAD CSV: header 'word'/'dataset' not found.");
-
-    // We allow missing some VAD columns, but we must have at least Human or EBW columns to show numbers
-    const hasHuman = (iV >= 0 || iA >= 0 || iD >= 0 || iC >= 0);
-    const hasEBW = (iEV >= 0 || iEA >= 0 || iED >= 0 || iEC >= 0);
-    if (!hasHuman && !hasEBW) {
-      throw new Error("VAD CSV: No usable VAD columns found (valence/arousal/dominance/concrete or EBW_*).");
-    }
 
     vadMap = new Map();
     vadBuckets = new Map();
@@ -406,14 +429,22 @@
       const wNorm = normalizePersian(wRaw);
       if (!wNorm) continue;
 
-      const dataset = String(row[iDataset] ?? "").trim();
-      const isExtrap = (dataset === "XXX");
+      const dataset = (row[iDataset] ?? "").trim().toUpperCase();
+      const isExtrap = dataset === "XXX";
 
-      // Rule you requested: XXX -> EBW_*, otherwise -> human columns
-      const val = (isExtrap && iEV >= 0) ? Number(row[iEV]) : (iV >= 0 ? Number(row[iV]) : null);
-      const aro = (isExtrap && iEA >= 0) ? Number(row[iEA]) : (iA >= 0 ? Number(row[iA]) : null);
-      const dom = (isExtrap && iED >= 0) ? Number(row[iED]) : (iD >= 0 ? Number(row[iD]) : null);
-      const con = (isExtrap && iEC >= 0) ? Number(row[iEC]) : (iC >= 0 ? Number(row[iC]) : null);
+      let val, aro, dom, con;
+
+      if (isExtrap) {
+        val = Number(row[iEV]);
+        aro = Number(row[iEA]);
+        dom = Number(row[iED]);
+        con = Number(row[iEC]);
+      } else {
+        val = Number(row[iV]);
+        aro = Number(row[iA]);
+        dom = Number(row[iD]);
+        con = Number(row[iC]);
+      }
 
       const rec = {
         source: isExtrap ? "Extrapolated" : "Human",
@@ -442,7 +473,6 @@
     const head = $("resultsHead");
     const body = $("resultsBody");
 
-    // hard fail if IDs mismatch
     if (!searchInput || !btnMore || !btnDl || !listInput || !fileInput || !btnAnalyze || !head || !body) {
       console.error("Some required element IDs are missing in index.html.");
       console.error({ searchInput, btnMore, btnDl, listInput, fileInput, btnAnalyze, head, body });
@@ -450,42 +480,38 @@
       return;
     }
 
-    // rerender on checkbox change
-    document.querySelectorAll(".affectChk").forEach((chk) => {
+    document.querySelectorAll(".affectChk").forEach(chk => {
       chk.addEventListener("change", () => renderTable());
     });
 
-    // Search typing (debounce)
+    // Search typing (debounce) - unchanged
     let t = null;
     searchInput.addEventListener("input", () => {
       clearTimeout(t);
       t = setTimeout(() => {
         const q = searchInput.value;
-        const nq = normalizePersian(q);
-        if (!nq) {
+        if (!normalizePersian(q)) {
           setResults([]);
           setStatus("آماده.");
           return;
         }
-        const rows = searchWords(nq);
+        const rows = searchWords(q);
         setResults(rows);
-        setStatus(`نتایج برای «${nq}»: ${rows.length} مورد`);
+        setStatus(`نتایج برای «${normalizePersian(q)}»: ${rows.length} مورد`);
       }, 150);
     });
 
-    // show more
     btnMore.addEventListener("click", () => {
       displayLimit += 20;
       renderTable();
     });
 
-    // download
     btnDl.addEventListener("click", () => downloadCSV());
 
     // analyze list/file
     btnAnalyze.addEventListener("click", async () => {
       const textAreaWords = listInput.value || "";
-      const file = (fileInput.files && fileInput.files[0]) ? fileInput.files[0] : null;
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
 
       let content = textAreaWords;
 
@@ -502,8 +528,8 @@
       const words = content
         .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
         .split("\n")
-        .map((x) => normalizePersian(x))
-        .filter((x) => x.length > 0);
+        .map(x => normalizePersian(x))
+        .filter(x => x.length > 0);
 
       if (!words.length) {
         setResults([]);
@@ -514,26 +540,18 @@
       const rows = [];
       const seen = new Set();
 
-      for (const w of words) {
-        const k = normalizePersian(w);
-        if (seen.has(k)) continue;
-        seen.add(k);
+      // ✅ SPEED: اینجا دیگر normalize تکراری و buildMatchKeys سنگین نداریم
+      for (const wNorm of words) {
+        if (seen.has(wNorm)) continue;
+        seen.add(wNorm);
 
-        const r = lookupOne(w);
-        if (r && r._hasAny) {
-          rows.push(r);
-        } else {
-          rows.push({
-            word: w,
-            perMillion: null,
-            zipf: null,
-            valence: null,
-            arousal: null,
-            dominance: null,
-            concreteness: null,
-            affectSource: null
-          });
-        }
+        const r = lookupOneNormalizedFast(wNorm);
+        if (r && r._hasAny) rows.push(r);
+        else rows.push({
+          word: wNorm, perMillion: null, zipf: null,
+          valence: null, arousal: null, dominance: null, concreteness: null,
+          affectSource: null
+        });
       }
 
       setResults(rows);
@@ -542,13 +560,15 @@
 
     // load data
     try {
-      setStatus("در حال بارگذاری بسامد…");
-      await loadFrequency();
+      setStatus("در حال بارگذاری داده‌ها…");
 
-      setStatus("در حال بارگذاری VAD…");
-      await loadVAD();
+      // ✅ SPEED: load in parallel (بدون تغییر خروجی)
+      await Promise.all([
+        loadFrequency(),
+        loadVAD()
+      ]);
 
-      setStatus(`آماده ✅ (Freq: ${freqMap.size} | VAD: ${vadMap.size})`);
+      setStatus(`آماده ✅ (Freq: ${freqBuckets.size} bucket | VAD: ${vadBuckets.size} bucket)`);
     } catch (e) {
       console.error(e);
       setStatus("خطا در بارگذاری داده‌ها. کنسول را بررسی کنید.");
