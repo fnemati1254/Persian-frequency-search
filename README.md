@@ -1,6 +1,9 @@
 Persian Lexical Characteristics Database
+
 پایگاه دادهٔ ویژگی‌های واژگانی زبان فارسی
+
 معرفی
+
 این ابزار یک پایگاه داده و رابط جست‌وجوی تعاملی برای ویژگی‌های واژگانی زبان فارسی است. این ویژگی‌ها شامل خوشایندی (Valence)، هیجان‌انگیختگی (Arousal)، سلطه (Dominance)، عینیت/ملموس‌بودگی (Concreteness) و شاخص‌های مبتنی بر بسامد (مانند Zipf) می‌شوند.
 تمام پردازش‌ها به‌صورت کاملاً محلی (client-side) انجام می‌شود و هیچ داده‌ای به سرور ارسال نمی‌گردد.
 
@@ -58,3 +61,4 @@ References
 Conneau, A., Khandelwal, K., Goyal, N., Chaudhary, V., Wenzek, G., Guzmán, F., … Stoyanov, V. (2020).Unsupervised cross-lingual representation learning at scale. Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics (ACL). https://doi.org/10.18653/v1/2020.acl-main.747
 Wenzek, G., Lachaux, M. A., Conneau, A., Chaudhary, V., Guzmán, F., Joulin, A., & Grave, É. (2020). CCNet: Extracting high quality monolingual datasets from web crawl data. Proceedings of the 12th Language Resources and Evaluation Conference (LREC), 4003–4012.
 Nemati, F., Westbury, C., Rostami, H., & Alavi, F. (2026). Extrapolated Persian Lexical Affect Norms (E-PLAN): From best–worst judgments of valence, arousal,
+
