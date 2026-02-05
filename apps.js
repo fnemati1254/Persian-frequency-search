@@ -386,6 +386,7 @@
     const iA = pickIndex(map, ["arousal"]);
     const iD = pickIndex(map, ["dominance"]);
     const iC = pickIndex(map, ["concreteness"]);
+    // Match the actual CSV column names: EBW_Valence, EBW_Arousal, etc.
     const iEV = pickIndex(map, ["ebw_valence"]);
     const iEA = pickIndex(map, ["ebw_arousal"]);
     const iED = pickIndex(map, ["ebw_dominance"]);
@@ -406,7 +407,7 @@
 
       const dataset = (row[iDataset] ?? "").trim().toUpperCase();
       
-      // FIX: Check if dataset is XXX (extrapolated) or VAL/DEV (human-rated)
+      // Check if dataset is XXX (extrapolated) or VAL/DEV (human-rated)
       const isExtrap = dataset === "XXX";
       
       // For XXX: use EBW_* columns (extrapolated)
