@@ -1,10 +1,10 @@
-Persian Lexical Characteristics Database
+Persian Lexical Characteristics Database (https://fnemati1254.github.io/Persian-frequency-search/)
 
 پایگاه دادهٔ ویژگی‌های واژگانی زبان فارسی
 
 معرفی
 
-این ابزار یک پایگاه داده و رابط جست‌وجوی تعاملی برای ویژگی‌های واژگانی زبان فارسی است. این ویژگی‌ها شامل خوشایندی (Valence)، هیجان‌انگیختگی (Arousal)، سلطه (Dominance)، عینیت/ملموس‌بودگی (Concreteness) و شاخص‌های مبتنی بر بسامد (مانند Zipf) می‌شوند.
+این ابزار (https://fnemati1254.github.io/Persian-frequency-search) یک پایگاه داده و رابط جست‌وجوی تعاملی برای ویژگی‌های واژگانی زبان فارسی است. این ویژگی‌ها شامل خوشایندی (Valence)، هیجان‌انگیختگی (Arousal)، سلطه (Dominance)، عینیت/ملموس‌بودگی (Concreteness) و شاخص‌های مبتنی بر بسامد (مانند Zipf) می‌شوند.
 تمام پردازش‌ها به‌صورت کاملاً محلی (client-side) انجام می‌شود و هیچ داده‌ای به سرور ارسال نمی‌گردد.
 
 داده‌های احساسی و عینیت (VAD & Concreteness)
@@ -40,7 +40,7 @@ Extrapolated Persian Lexical Affect Norms (E-PLAN): From Best–Worst Judgments 
 
 Overview
 
-This project provides a searchable database and interactive web interface for Persian lexical characteristics, including Valence, Arousal, Dominance, Concreteness, and frequency-based measures (e.g., Zipf).
+This project (https://fnemati1254.github.io/Persian-frequency-search/) provides a searchable database and interactive web interface for Persian lexical characteristics, including Valence, Arousal, Dominance, Concreteness, and frequency-based measures (e.g., Zipf).
 All computations are performed entirely client-side, and no user data are transmitted or stored.
 Affective and Concreteness Ratings (VAD & Concreteness)
 The affective and concreteness values are based on the paper accepted in Behavior Research Methods (2026) entitled:
@@ -61,4 +61,5 @@ References
 Conneau, A., Khandelwal, K., Goyal, N., Chaudhary, V., Wenzek, G., Guzmán, F., … Stoyanov, V. (2020).Unsupervised cross-lingual representation learning at scale. Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics (ACL). https://doi.org/10.18653/v1/2020.acl-main.747
 Wenzek, G., Lachaux, M. A., Conneau, A., Chaudhary, V., Guzmán, F., Joulin, A., & Grave, É. (2020). CCNet: Extracting high quality monolingual datasets from web crawl data. Proceedings of the 12th Language Resources and Evaluation Conference (LREC), 4003–4012.
 Nemati, F., Westbury, C., Rostami, H., & Alavi, F. (2026). Extrapolated Persian Lexical Affect Norms (E-PLAN): From best–worst judgments of valence, arousal,
+
 
