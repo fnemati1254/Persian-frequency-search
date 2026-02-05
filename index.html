@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ویژگی‌های واژگانی زبان فارسی</title>
+  <title> ویژگی‌های واژگانی زبان فارسی</title>
 
   <style>
     :root { --border:#ddd; --bg:#f7f7f7; --text:#222; --muted:#666; }
@@ -41,6 +41,7 @@
       margin: 8px 0 0;
     }
     .checks label{ display:flex; gap:6px; align-items:center; font-size:.95rem; }
+    hr{ border:0; border-top:1px solid var(--border); margin: 14px 0; }
 
     table{
       width:100%;
@@ -72,6 +73,7 @@
       cursor: pointer;
       font-size: .95rem;
     }
+    button:hover{ background: #fafafa; }
     button:disabled{ opacity:.5; cursor:not-allowed; }
 
     textarea{
@@ -86,7 +88,7 @@
     }
 
     .fileRow{
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      display:flex; gap:10px; align-items:center; justify-content:flex-start; flex-wrap:wrap;
       margin-top: 10px;
     }
     .small{ font-size:.9rem; color:var(--muted); }
@@ -94,42 +96,22 @@
 </head>
 
 <body>
-
-  <h1 id="pageTitle">🔎 ویژگی‌های واژگانی زبان فارسی</h1>
-
-  <!-- Language selector -->
-  <div class="row" style="justify-content:flex-end; margin-bottom:6px;">
-    <label class="small">
-      Language:
-      <select id="langSelect">
-        <option value="fa" selected>فارسی</option>
-        <option value="en">English</option>
-      </select>
-    </label>
-  </div>
+  <h1>🔎 ویژگی‌های واژگانی زبان فارسی</h1>
 
   <div class="panel">
     <input id="searchInput" type="text"
-      placeholder="مثال: آهن، آب، هدفمند، هدف "
+      placeholder="مثال: آهن، شاید، هدفمند"
       autocomplete="off"
     />
 
     <div id="status" class="note">در حال بارگذاری داده‌ها…</div>
 
-    <div class="checks">
-      <span class="small" id="affectLabel">انتخاب مشخصه‌های واژگانی:</span>
-      <label><input type="checkbox" class="affectChk" value="valence" checked>
-        <span data-i18n="valence">Valence خوشایندی </span>
-      </label>
-      <label><input type="checkbox" class="affectChk" value="arousal" checked>
-        <span data-i18n="arousal">Arousal هیجان </span>
-      </label>
-      <label><input type="checkbox" class="affectChk" value="dominance">
-        <span data-i18n="dominance">Dominance سلطه </span>
-      </label>
-      <label><input type="checkbox" class="affectChk" value="concreteness">
-        <span data-i18n="concreteness">Concreteness عینیت</span>
-      </label>
+    <div class="checks" aria-label="Affect feature selection">
+      <span class="small">انتخاب مشخصه‌های احساسی:</span>
+      <label><input type="checkbox" class="affectChk" value="valence" checked> Valence</label>
+      <label><input type="checkbox" class="affectChk" value="arousal" checked> Arousal</label>
+      <label><input type="checkbox" class="affectChk" value="dominance"> Dominance</label>
+      <label><input type="checkbox" class="affectChk" value="concreteness"> Concreteness</label>
     </div>
 
     <div class="actions">
@@ -137,31 +119,37 @@
       <button id="btnDownload" disabled>دانلود خروجی (CSV/Excel)</button>
     </div>
 
-    <table>
+    <table id="resultsTable">
       <thead id="resultsHead"></thead>
       <tbody id="resultsBody"></tbody>
     </table>
 
-    <div class="note" id="clientNote">
-      همه پردازش‌ها کاملاً محلی (client-side) انجام می‌شود.
-    </div>
+    <div class="note">همه پردازش‌ها کاملاً محلی (client-side) انجام می‌شود.</div>
   </div>
 
   <div class="panel">
-    <div style="font-weight:600;">📄 تحلیل فهرست واژه یا فایل</div>
-    <div class="note" id="fileNote">
-      هر واژه را در یک خط بنویسید، یا فایل متنی با پسوند .txt بارگذاری کنید.
+    <div class="row" style="justify-content:space-between;">
+      <div style="font-weight:600;">📄 تحلیل فهرست واژه یا فایل</div>
     </div>
 
-    <textarea id="listInput"></textarea>
+    <div class="note">هر واژه را در یک خط بنویسید، یا فایل متنی با پسوند .txt بارگذاری کنید.</div>
+
+    <textarea id="listInput" placeholder="مثال:
+هدف مند
+هدف‌مند
+هدفمند
+آهن
+آب"></textarea>
 
     <div class="fileRow">
       <input id="fileInput" type="file" accept=".txt,.csv" />
       <button id="btnAnalyze">محاسبه</button>
-      <span class="small">UTF-8 — هر واژه در یک خط</span>
+      <span class="small">فرمت پیشنهادی فایل: .txt (UTF-8) — هر واژه در یک خط</span>
     </div>
   </div>
 
   <script src="apps.js"></script>
 </body>
 </html>
+
+
