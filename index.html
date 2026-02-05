@@ -1,17 +1,16 @@
 <!DOCTYPE html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
-<meta charset="UTF-8" />
-<title>Persian Word Frequency & Affect</title>
-
-<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+<meta charset="UTF-8">
+<title>بسامد و ویژگی‌های احساسی واژه‌های فارسی</title>
 
 <style>
 body {
   font-family: sans-serif;
-  max-width: 900px;
+  max-width: 1000px;
   margin: 2rem auto;
-  line-height: 1.7;
+  line-height: 1.8;
+  direction: rtl;
 }
 input, textarea {
   width: 100%;
@@ -30,7 +29,8 @@ th, td {
 }
 th { background:#f5f5f5; }
 .note { color:#555; font-size:0.9rem; }
-button { padding:0.6rem 1rem; margin-top:0.5rem; }
+button { padding:0.5rem 1rem; margin-top:0.5rem; }
+.controls label { margin-left: 1rem; }
 </style>
 </head>
 
@@ -38,38 +38,40 @@ button { padding:0.6rem 1rem; margin-top:0.5rem; }
 
 <h2>🔎 بسامد و ویژگی‌های احساسی واژه‌های فارسی</h2>
 
-<input id="searchBox" placeholder="مثال: آهن، کتاب، هدفمند" />
+<input id="searchInput" placeholder="مثال: آهن، کتاب، هدفمند">
 
-<div>
-<label><input type="checkbox" id="valence" checked> Valence</label>
-<label><input type="checkbox" id="arousal" checked> Arousal</label>
-<label><input type="checkbox" id="dominance"> Dominance</label>
-<label><input type="checkbox" id="concreteness"> Concreteness</label>
+<div class="controls">
+  <label><input type="checkbox" id="valence" checked> Valence</label>
+  <label><input type="checkbox" id="arousal" checked> Arousal</label>
+  <label><input type="checkbox" id="dominance"> Dominance</label>
+  <label><input type="checkbox" id="concreteness" checked> Concreteness</label>
 </div>
 
 <table>
 <thead>
 <tr>
-<th>واژه</th>
-<th>Per Million</th>
-<th>Zipf</th>
-<th>Valence</th>
-<th>Arousal</th>
-<th>Dominance</th>
-<th>Concreteness</th>
-<th>Affect_Source</th>
+  <th>واژه</th>
+  <th>Per Million</th>
+  <th>Zipf</th>
+  <th>Valence</th>
+  <th>Arousal</th>
+  <th>Dominance</th>
+  <th>Concreteness</th>
+  <th>Affect Source</th>
 </tr>
 </thead>
-<tbody id="results"></tbody>
+<tbody id="resultsBody"></tbody>
 </table>
 
+<button id="loadMore">نمایش بیشتر</button>
 <button id="download">⬇️ دانلود خروجی (Excel / CSV)</button>
 
 <hr>
 
-<h3>📄 تحلیل فهرست واژه یا فایل متنی</h3>
-<textarea id="wordList" rows="6" placeholder="هر واژه در یک خط"></textarea>
-<input type="file" id="fileInput" />
+<h3>📄 تحلیل فهرست واژه یا فایل</h3>
+<textarea id="listInput" rows="6" placeholder="هر واژه در یک خط"></textarea>
+<input type="file" id="fileInput">
+<br>
 <button id="analyzeList">محاسبه</button>
 
 <script src="apps.js"></script>
