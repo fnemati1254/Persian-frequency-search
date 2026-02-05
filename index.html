@@ -2,7 +2,7 @@
 <html lang="fa">
 <head>
   <meta charset="UTF-8" />
-  <title>Persian Word Frequency Search</title>
+  <title>Persian Word Frequency & Affect Search</title>
 
   <!-- Fuse.js -->
   <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
@@ -10,7 +10,7 @@
   <style>
     body {
       font-family: sans-serif;
-      max-width: 900px;
+      max-width: 1000px;
       margin: 2rem auto;
       line-height: 1.6;
       direction: rtl;
@@ -53,75 +53,59 @@
     }
     .row button {
       width: auto;
-      flex: 0 0 auto;
-      padding: 0.55rem 0.9rem;
       white-space: nowrap;
     }
     #showMoreBtn { display: none; }
+    .features label { margin-left: 1rem; }
   </style>
 </head>
 
 <body>
 
-  <h2>🔍 جستجوی بسامد واژه‌های فارسی</h2>
+<h2>🔍 جستجوی بسامد و احساس واژه‌های فارسی</h2>
 
-  <p class="note">
-    بسامدها بر اساس یک پیکرهٔ بزرگ فارسی محاسبه شده‌اند و به‌صورت «در میلیون» و مقیاس Zipf گزارش می‌شوند.
-  </p>
+<p class="note">
+  بسامد، Valence، Arousal، Dominance و Concreteness به‌صورت محلی (client-side) بازیابی می‌شوند.
+  منبع قضاوت احساسی (Human / Extrapolated) به‌صورت شفاف گزارش می‌شود.
+</p>
 
-  <input
-    id="searchBox"
-    placeholder="مثال: کتاب، گفت‌وگو، تک‌گویی"
-    autocomplete="off"
-  />
+<input id="searchBox" placeholder="مثال: هدفمند، کتاب، گفت‌وگو" autocomplete="off" />
 
-  <div id="status" class="note">در حال بارگذاری داده‌ها…</div>
+<div id="status" class="note">در حال بارگذاری داده‌ها…</div>
 
-  <div class="note">
-    جستجو به‌صورت محلی و بدون ارسال داده انجام می‌شود.
-  </div>
+<div class="features note">
+  <strong>انتخاب مشخصه‌های احساسی:</strong><br>
+  <label><input type="checkbox" class="feat" value="valence" checked> Valence</label>
+  <label><input type="checkbox" class="feat" value="arousal" checked> Arousal</label>
+  <label><input type="checkbox" class="feat" value="dominance"> Dominance</label>
+  <label><input type="checkbox" class="feat" value="concreteness"> Concreteness</label>
+</div>
 
-  <table id="results">
-    <thead>
-      <tr>
-        <th>واژه</th>
-        <th>بسامد در میلیون (Per Million)</th>
-        <th>زیف (Zipf)</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+<table id="results">
+  <thead></thead>
+  <tbody></tbody>
+</table>
 
-  <div class="row">
-    <button id="exportBtn">⬇️ دانلود خروجی (Excel / CSV)</button>
-    <button id="showMoreBtn">نمایش بیشتر</button>
-  </div>
+<div class="row">
+  <button id="exportBtn">⬇️ دانلود خروجی (Excel / CSV)</button>
+  <button id="showMoreBtn">نمایش بیشتر</button>
+</div>
 
-  <hr>
+<hr>
 
-  <h3>📄 محاسبهٔ بسامد برای فایل یا فهرست واژه‌ها</h3>
+<h3>📄 تحلیل فهرست واژه یا فایل متنی</h3>
 
-  <p class="note">
-    هر واژه را در یک خط بنویسید یا یک فایل متنی فارسی ( با پسوند .txt) بارگذاری کنید.
-    <br>
-    حالت‌های املایی مانند «هدفمند / هدف‌مند / هدف مند» همگی پشتیبانی می‌شوند.
-  </p>
-
-  <textarea
-    id="wordList"
-    rows="6"
-    placeholder="مثال:
-کتاب
-مدرسه
-توانایی
+<textarea id="wordList" rows="6"
+placeholder="مثال:
 هدف مند
-هدف‌مند"
-  ></textarea>
+هدف‌مند
+ابتدا
+آباد"></textarea>
 
-  <input type="file" id="fileInput" accept=".txt">
+<input type="file" id="fileInput" accept=".txt">
 
-  <button id="analyzeBtn">محاسبهٔ بسامد</button>
+<button id="analyzeBtn">محاسبه</button>
 
-  <script src="apps.js"></script>
+<script src="apps.js"></script>
 </body>
 </html>
