@@ -326,17 +326,18 @@
     URL.revokeObjectURL(url);
   }
 
-  // ---------- Load datasets ----------
   async function loadFrequency() {
-    const res = await fetch("word_frequencies_public.tsv", { cache: "no-store" });
+    const res = await fetch("word_frequencies_public.tsv", { cache: "force-cache" }); // Enable browser caching
     if (!res.ok) throw new Error("Cannot load word_frequencies_public.tsv");
     const text = await res.text();
     const rows = parseTSV(text);
 
     const header = rows[0];
     const map = headerIndexMap(header);
-    const iWord = pickIndex(map, ["word", "token", "w"]);
-    const iPerM = pickIndex(map, ["per_million", "permillion", "per million"]);
+    
+    // Your actual headers: Word, PerMillion, Zipf
+    const iWord = pickIndex(map, ["word"]);
+    const iPerM = pickIndex(map, ["permillion", "per_million", "per million"]);
     const iZipf = pickIndex(map, ["zipf"]);
 
     if (iWord < 0) throw new Error("Frequency TSV: header 'word' not found.");
@@ -344,35 +345,53 @@
     freqMap = new Map();
     freqBuckets = new Map();
 
-    for (let r = 1; r < rows.length; r++) {
-      const row = rows[r];
-      const wRaw = row[iWord];
-      if (!wRaw) continue;
+    // Process in batches to prevent UI freeze and show progress
+    const batchSize = 1000;
+    let processed = 0;
 
-      const wNorm = normalizePersian(wRaw);
-      if (!wNorm) continue;
+    for (let r = 1; r < rows.length; r += batchSize) {
+      const endIdx = Math.min(r + batchSize, rows.length);
+      
+      for (let i = r; i < endIdx; i++) {
+        const row = rows[i];
+        const wRaw = row[iWord];
+        if (!wRaw) continue;
 
-      const perM = iPerM >= 0 ? Number(row[iPerM]) : null;
-      const zipf = iZipf >= 0 ? Number(row[iZipf]) : null;
+        const wNorm = normalizePersian(wRaw);
+        if (!wNorm) continue;
 
-      const rec = {
-        word: wNorm,
-        perMillion: Number.isFinite(perM) ? perM : null,
-        zipf: Number.isFinite(zipf) ? zipf : null
-      };
+        const perM = iPerM >= 0 ? Number(row[iPerM]) : null;
+        const zipf = iZipf >= 0 ? Number(row[iZipf]) : null;
 
-      // canonical word in bucket
-      addToBucket(freqBuckets, wNorm);
+        const rec = {
+          word: wNorm,
+          perMillion: Number.isFinite(perM) ? perM : null,
+          zipf: Number.isFinite(zipf) ? zipf : null
+        };
 
-      // keys in map for robust match
-      for (const k of buildMatchKeys(wNorm)) {
-        if (!freqMap.has(k)) freqMap.set(k, rec);
+        // canonical word in bucket
+        addToBucket(freqBuckets, wNorm);
+
+        // keys in map for robust match
+        for (const k of buildMatchKeys(wNorm)) {
+          if (!freqMap.has(k)) freqMap.set(k, rec);
+        }
+      }
+      
+      processed = endIdx - 1;
+      
+      // Update progress every 5000 rows or at the end
+      if (processed % 5000 === 0 || endIdx >= rows.length) {
+        const percent = Math.round((processed / rows.length) * 100);
+        setStatus(`بارگذاری بسامد: ${percent}%`);
+        // Yield to UI thread to prevent freezing
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
   }
 
   async function loadVAD() {
-    const res = await fetch("vad_data.csv", { cache: "no-store" });
+    const res = await fetch("vad_data.csv", { cache: "force-cache" }); // Enable browser caching
     if (!res.ok) throw new Error("Cannot load vad_data.csv");
     const text = await res.text();
     const rows = parseCSV(text);
@@ -397,48 +416,66 @@
     vadMap = new Map();
     vadBuckets = new Map();
 
-    for (let r = 1; r < rows.length; r++) {
-      const row = rows[r];
-      const wRaw = row[iWord];
-      if (!wRaw) continue;
+    // Process in batches to prevent UI freeze and show progress
+    const batchSize = 1000;
+    let processed = 0;
 
-      const wNorm = normalizePersian(wRaw);
-      if (!wNorm) continue;
+    for (let r = 1; r < rows.length; r += batchSize) {
+      const endIdx = Math.min(r + batchSize, rows.length);
+      
+      for (let i = r; i < endIdx; i++) {
+        const row = rows[i];
+        const wRaw = row[iWord];
+        if (!wRaw) continue;
 
-      const dataset = (row[iDataset] ?? "").trim().toUpperCase();
-      
-      // Check if dataset is XXX (extrapolated) or VAL/DEV (human-rated)
-      const isExtrap = dataset === "XXX";
-      
-      // For XXX: use EBW_* columns (extrapolated)
-      // For VAL/DEV: use human-rated columns
-      let val, aro, dom, con;
-      
-      if (isExtrap) {
-        val = Number(row[iEV]);
-        aro = Number(row[iEA]);
-        dom = Number(row[iED]);
-        con = Number(row[iEC]);
-      } else {
-        // VAL or DEV dataset - use human columns
-        val = Number(row[iV]);
-        aro = Number(row[iA]);
-        dom = Number(row[iD]);
-        con = Number(row[iC]);
+        const wNorm = normalizePersian(wRaw);
+        if (!wNorm) continue;
+
+        const dataset = (row[iDataset] ?? "").trim().toUpperCase();
+        
+        // Check if dataset is XXX (extrapolated) or VAL/DEV (human-rated)
+        const isExtrap = dataset === "XXX";
+        
+        // For XXX: use EBW_* columns (extrapolated)
+        // For VAL/DEV: use human-rated columns
+        let val, aro, dom, con;
+        
+        if (isExtrap) {
+          val = Number(row[iEV]);
+          aro = Number(row[iEA]);
+          dom = Number(row[iED]);
+          con = Number(row[iEC]);
+        } else {
+          // VAL or DEV dataset - use human columns
+          val = Number(row[iV]);
+          aro = Number(row[iA]);
+          dom = Number(row[iD]);
+          con = Number(row[iC]);
+        }
+
+        const rec = {
+          source: isExtrap ? "Extrapolated" : "Human",
+          valence: Number.isFinite(val) ? val : null,
+          arousal: Number.isFinite(aro) ? aro : null,
+          dominance: Number.isFinite(dom) ? dom : null,
+          concreteness: Number.isFinite(con) ? con : null
+        };
+
+        addToBucket(vadBuckets, wNorm);
+
+        for (const k of buildMatchKeys(wNorm)) {
+          if (!vadMap.has(k)) vadMap.set(k, rec);
+        }
       }
-
-      const rec = {
-        source: isExtrap ? "Extrapolated" : "Human",
-        valence: Number.isFinite(val) ? val : null,
-        arousal: Number.isFinite(aro) ? aro : null,
-        dominance: Number.isFinite(dom) ? dom : null,
-        concreteness: Number.isFinite(con) ? con : null
-      };
-
-      addToBucket(vadBuckets, wNorm);
-
-      for (const k of buildMatchKeys(wNorm)) {
-        if (!vadMap.has(k)) vadMap.set(k, rec);
+      
+      processed = endIdx - 1;
+      
+      // Update progress every 5000 rows or at the end
+      if (processed % 5000 === 0 || endIdx >= rows.length) {
+        const percent = Math.round((processed / rows.length) * 100);
+        setStatus(`بارگذاری VAD: ${percent}%`);
+        // Yield to UI thread to prevent freezing
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
   }
@@ -461,6 +498,42 @@
       setStatus("خطا: بعضی IDها در index.html پیدا نشد.");
       return;
     }
+
+    // Drag and drop support for file input
+    const fileRow = fileInput.parentElement;
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      fileRow.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      fileRow.addEventListener(eventName, () => {
+        fileRow.style.background = '#e8f4f8';
+        fileRow.style.border = '2px dashed #2196F3';
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      fileRow.addEventListener(eventName, () => {
+        fileRow.style.background = '';
+        fileRow.style.border = '';
+      }, false);
+    });
+
+    fileRow.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      
+      if (files.length > 0) {
+        fileInput.files = files;
+        setStatus(`فایل انتخاب شد: ${files[0].name}`);
+      }
+    }, false);
 
     // rerender on checkbox change
     document.querySelectorAll(".affectChk").forEach(chk => {
@@ -510,17 +583,68 @@
       let content = textAreaWords;
 
       if (file) {
-        const fileText = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ""));
-          reader.onerror = () => reject(new Error("FileReader failed"));
-          reader.readAsText(file, "utf-8");
-        });
-        content = (content ? content + "\n" : "") + fileText;
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+          setStatus("خطا: حجم فایل بیش از 10 مگابایت است.");
+          return;
+        }
+
+        // Validate file type
+        const validExtensions = ['.txt', '.csv', '.tsv'];
+        const fileName = file.name.toLowerCase();
+        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (!isValid) {
+          setStatus("خطا: فقط فایل‌های .txt، .csv، .tsv پذیرفته می‌شوند.");
+          return;
+        }
+
+        setStatus(`در حال خواندن فایل: ${file.name}...`);
+
+        try {
+          // Use FileReader with better error handling
+          const fileText = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            // Progress tracking (optional - for large files)
+            reader.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                setStatus(`در حال خواندن: ${percent}%`);
+              }
+            };
+            
+            reader.onload = () => {
+              const result = reader.result;
+              if (typeof result === 'string') {
+                resolve(result);
+              } else {
+                reject(new Error("خطا در خواندن فایل"));
+              }
+            };
+            
+            reader.onerror = () => {
+              reject(new Error(`خطا در خواندن فایل: ${reader.error?.message || 'نامشخص'}`));
+            };
+            
+            reader.readAsText(file, "utf-8");
+          });
+          
+          content = (content ? content + "\n" : "") + fileText;
+          setStatus("در حال پردازش واژه‌ها...");
+          
+        } catch (error) {
+          console.error("File reading error:", error);
+          setStatus(`خطا: ${error.message}`);
+          return;
+        }
       }
 
+      // Parse words with improved efficiency
       const words = content
-        .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
         .split("\n")
         .map(x => normalizePersian(x))
         .filter(x => x.length > 0);
@@ -531,36 +655,70 @@
         return;
       }
 
+      // Limit maximum words to prevent browser freeze
+      const maxWords = 10000;
+      if (words.length > maxWords) {
+        setStatus(`تعداد واژه‌ها (${words.length}) بیش از حد مجاز (${maxWords}) است. فقط ${maxWords} واژه اول پردازش می‌شود.`);
+      }
+
+      const wordsToProcess = words.slice(0, maxWords);
       const rows = [];
       const seen = new Set();
 
-      for (const w of words) {
-        const k = normalizePersian(w);
-        if (seen.has(k)) continue;
-        seen.add(k);
+      // Process in batches for better performance
+      const batchSize = 100;
+      let processed = 0;
 
-        const r = lookupOne(w);
-        if (r && r._hasAny) rows.push(r);
-        else rows.push({
-          word: w, perMillion: null, zipf: null,
-          valence: null, arousal: null, dominance: null, concreteness: null,
-          affectSource: null
-        });
+      for (let i = 0; i < wordsToProcess.length; i += batchSize) {
+        const batch = wordsToProcess.slice(i, i + batchSize);
+        
+        for (const w of batch) {
+          const k = normalizePersian(w);
+          if (seen.has(k)) continue;
+          seen.add(k);
+
+          const r = lookupOne(w);
+          if (r && r._hasAny) rows.push(r);
+          else rows.push({
+            word: w, perMillion: null, zipf: null,
+            valence: null, arousal: null, dominance: null, concreteness: null,
+            affectSource: null
+          });
+        }
+
+        processed += batch.length;
+        
+        // Update progress and yield to UI thread every batch
+        setStatus(`پردازش: ${processed} از ${wordsToProcess.length} واژه...`);
+        
+        // Yield to browser to prevent UI freeze
+        if (i + batchSize < wordsToProcess.length) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
 
       setResults(rows);
-      setStatus(`تحلیل انجام شد: ${rows.length} واژه`);
+      
+      const duplicates = wordsToProcess.length - rows.length;
+      let statusMsg = `تحلیل انجام شد: ${rows.length} واژه`;
+      if (duplicates > 0) {
+        statusMsg += ` (${duplicates} واژه تکراری حذف شد)`;
+      }
+      setStatus(statusMsg);
+    });
     });
 
-    // load data
+    // load data - PARALLEL LOADING for faster startup
     try {
-      setStatus("در حال بارگذاری بسامد…");
-      await loadFrequency();
+      setStatus("در حال بارگذاری داده‌ها...");
+      
+      // Load both files in parallel instead of sequentially
+      await Promise.all([
+        loadFrequency(),
+        loadVAD()
+      ]);
 
-      setStatus("در حال بارگذاری VAD…");
-      await loadVAD();
-
-      setStatus(`آماده ✅ (Freq: ${freqBuckets.size} bucket | VAD: ${vadBuckets.size} bucket)`);
+      setStatus(`آماده ✅ (بسامد: ${freqMap.size} واژه | VAD: ${vadMap.size} واژه)`);
     } catch (e) {
       console.error(e);
       setStatus("خطا در بارگذاری داده‌ها. کنسول را بررسی کنید.");
