@@ -447,7 +447,7 @@
       }
 
       const rec = {
-        source: isExtrap ? "Extrapolated" : "Human",
+        source: isExtrap ? "Predicted" : "Human",
         valence: Number.isFinite(val) ? val : null,
         arousal: Number.isFinite(aro) ? aro : null,
         dominance: Number.isFinite(dom) ? dom : null,
@@ -577,3 +577,4 @@
 
   document.addEventListener("DOMContentLoaded", init);
 })();
+
