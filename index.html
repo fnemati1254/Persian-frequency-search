@@ -49,31 +49,31 @@
 
 <h2>🔎 بسامد و ویژگی‌های احساسی واژه‌های فارسی</h2>
 
-<input id="searchBox" placeholder="مثال: آب، هدف‌مند، کتاب" />
+<input id="searchInput" placeholder="مثال: آب، هدف‌مند، کتاب" />
 
 <div class="controls">
-  <label><input type="checkbox" id="cVal" checked> Valence</label>
-  <label><input type="checkbox" id="cAro"> Arousal</label>
-  <label><input type="checkbox" id="cDom"> Dominance</label>
-  <label><input type="checkbox" id="cCon" checked> Concreteness</label>
+  <label><input type="checkbox" id="optVal" checked> Valence</label>
+  <label><input type="checkbox" id="optAro"> Arousal</label>
+  <label><input type="checkbox" id="optDom"> Dominance</label>
+  <label><input type="checkbox" id="optCon" checked> Concreteness</label>
 </div>
 
 <table>
-  <thead id="thead"></thead>
-  <tbody id="tbody"></tbody>
+  <thead id="tableHead"></thead>
+  <tbody id="tableBody"></tbody>
 </table>
 
-<button id="showMore">نمایش بیشتر</button>
-<button id="download">دانلود خروجی (CSV / Excel)</button>
+<button id="btnMore">نمایش بیشتر</button>
+<button id="btnDownload">دانلود خروجی (CSV / Excel)</button>
 
 <hr>
 
 <h3>📄 تحلیل فهرست واژه یا فایل متنی</h3>
 
-<textarea id="listBox" rows="5" placeholder="هر واژه در یک خط"></textarea>
+<textarea id="listInput" rows="5" placeholder="هر واژه در یک خط"></textarea>
 <input type="file" id="fileInput" accept=".txt,.csv" />
 <br>
-<button id="analyzeList">محاسبه</button>
+<button id="btnAnalyze">محاسبه</button>
 
 <div class="note">
 همهٔ پردازش‌ها کاملاً محلی (client-side) انجام می‌شوند.
