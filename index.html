@@ -1,78 +1,105 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<title>بسامد و ویژگی‌های احساسی واژه‌های فارسی</title>
-
-<style>
-body {
-  font-family: sans-serif;
-  max-width: 1000px;
-  margin: 2rem auto;
-  line-height: 1.8;
-  direction: rtl;
-}
-input, textarea {
-  width: 100%;
-  padding: 0.6rem;
-  font-size: 1rem;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-th, td {
-  border-bottom: 1px solid #ddd;
-  padding: 0.4rem;
-  text-align: right;
-}
-th { background:#f5f5f5; }
-.note { color:#555; font-size:0.9rem; }
-button { padding:0.5rem 1rem; margin-top:0.5rem; }
-.controls label { margin-left: 1rem; }
-</style>
+  <meta charset="UTF-8" />
+  <title>بسامد و ویژگی‌های احساسی واژه‌های فارسی</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      line-height: 1.7;
+    }
+    input, textarea, button {
+      font-size: 1rem;
+      padding: 0.5rem;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border-bottom: 1px solid #ddd;
+      padding: 0.4rem;
+      text-align: right;
+    }
+    th {
+      background: #f5f5f5;
+    }
+    .controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 0.5rem 0;
+    }
+    .controls label {
+      display: flex;
+      gap: 0.3rem;
+      align-items: center;
+      width: auto;
+    }
+    .note {
+      font-size: 0.9rem;
+      color: #555;
+    }
+  </style>
 </head>
 
 <body>
 
 <h2>🔎 بسامد و ویژگی‌های احساسی واژه‌های فارسی</h2>
 
-<input id="searchInput" placeholder="مثال: آهن، کتاب، هدفمند">
+<input
+  id="searchInput"
+  placeholder="مثال: آهن، هدفمند، کتاب"
+/>
 
 <div class="controls">
-  <label><input type="checkbox" id="valence" checked> Valence</label>
-  <label><input type="checkbox" id="arousal" checked> Arousal</label>
-  <label><input type="checkbox" id="dominance"> Dominance</label>
-  <label><input type="checkbox" id="concreteness" checked> Concreteness</label>
+  <label><input type="checkbox" value="valence" checked> Valence</label>
+  <label><input type="checkbox" value="arousal"> Arousal</label>
+  <label><input type="checkbox" value="dominance"> Dominance</label>
+  <label><input type="checkbox" value="concreteness" checked> Concreteness</label>
 </div>
 
 <table>
-<thead>
-<tr>
-  <th>واژه</th>
-  <th>Per Million</th>
-  <th>Zipf</th>
-  <th>Valence</th>
-  <th>Arousal</th>
-  <th>Dominance</th>
-  <th>Concreteness</th>
-  <th>Affect Source</th>
-</tr>
-</thead>
-<tbody id="resultsBody"></tbody>
+  <thead>
+    <tr>
+      <th>واژه</th>
+      <th>Per Million</th>
+      <th>Zipf</th>
+      <th>Valence</th>
+      <th>Arousal</th>
+      <th>Dominance</th>
+      <th>Concreteness</th>
+      <th>Affect Source</th>
+    </tr>
+  </thead>
+  <tbody id="resultsBody"></tbody>
 </table>
 
 <button id="loadMore">نمایش بیشتر</button>
-<button id="download">⬇️ دانلود خروجی (Excel / CSV)</button>
+<button id="download">دانلود خروجی (CSV / Excel)</button>
 
 <hr>
 
-<h3>📄 تحلیل فهرست واژه یا فایل</h3>
-<textarea id="listInput" rows="6" placeholder="هر واژه در یک خط"></textarea>
-<input type="file" id="fileInput">
-<br>
+<h3>📄 تحلیل فهرست واژه یا فایل متنی</h3>
+
+<textarea
+  id="listInput"
+  rows="6"
+  placeholder="هر واژه در یک خط"
+></textarea>
+
+<input type="file" id="fileInput" accept=".txt" />
+
 <button id="analyzeList">محاسبه</button>
+
+<p class="note">
+  همه پردازش‌ها به‌صورت محلی (client-side) انجام می‌شود.
+</p>
 
 <script src="apps.js"></script>
 </body>
