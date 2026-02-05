@@ -470,6 +470,8 @@
     let t = null;
     searchInput.addEventListener("input", () => {
       clearTimeout(t);
+      // Clear results immediately when user starts typing
+      setResults([]);
       t = setTimeout(() => {
         const q = searchInput.value;
         if (!normalizePersian(q)) {
@@ -494,6 +496,10 @@
 
     // analyze list/file
     btnAnalyze.addEventListener("click", async () => {
+      // Clear previous results first
+      setResults([]);
+      setStatus("در حال پردازش...");
+      
       const textAreaWords = listInput.value || "";
       const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
 
