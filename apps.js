@@ -15,7 +15,7 @@
     s = s.replace(/\u00A0/g, " ");
     s = s.replace(/\s+/g, " ").trim();
 
-    s = s.replace(/ي/g, "ی").replace(/ك/g, "ک");
+    s = s.replace(/\u064A/g, "ی").replace(/\u0643/g, "ک");  // ك → ک
     s = s.replace(/ۀ/g, "ه").replace(/ة/g, "ه");
     s = s.replace(/ؤ/g, "و").replace(/أ|إ|ٱ/g, "ا");
 
@@ -577,4 +577,5 @@
 
   document.addEventListener("DOMContentLoaded", init);
 })();
+
 
