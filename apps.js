@@ -127,9 +127,8 @@
     const statusElement = $('status');
     if (statusElement) {
       statusElement.textContent = message;
-    } else {
-      console.log('Status:', message);
     }
+    console.log('Status:', message);
   }
 
   // ---------- Load Frequency Data ----------
@@ -137,9 +136,10 @@
     setStatus("در حال بارگذاری داده‌های فرکانس...");
     
     try {
-      const response = await fetch('persian_frequency.tsv'); // Adjust path as needed
+      // Correct filename from repository
+      const response = await fetch('word_frequencies_public.tsv');
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP ${response.status}: نمی‌توان فایل فرکانس را بارگذاری کرد`);
       }
       
       const text = await response.text();
@@ -149,10 +149,13 @@
         throw new Error('فایل فرکانس خالی است');
       }
 
+      console.log(`تعداد سطرهای فایل فرکانس: ${rows.length}`);
+      
       // Process rows (skip header if exists)
       const hasHeader = isNaN(parseFloat(rows[0][1]));
       const dataRows = hasHeader ? rows.slice(1) : rows;
       
+      let loaded = 0;
       for (const row of dataRows) {
         if (row.length < 2) continue;
         
@@ -169,10 +172,11 @@
               freqMap.set(k, data);
             }
           }
+          loaded++;
         }
       }
       
-      console.log(`بارگذاری ${freqMap.size} ورودی فرکانس انجام شد`);
+      console.log(`✓ ${loaded} واژه فرکانس بارگذاری شد (${freqMap.size} کلید)`);
     } catch (error) {
       console.error('خطا در بارگذاری فرکانس:', error);
       throw error;
@@ -184,9 +188,10 @@
     setStatus("در حال بارگذاری داده‌های VAD...");
     
     try {
-      const response = await fetch('persian_vad.csv'); // Adjust path as needed
+      // Correct filename from repository
+      const response = await fetch('vad_data.csv');
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP ${response.status}: نمی‌توان فایل VAD را بارگذاری کرد`);
       }
       
       const text = await response.text();
@@ -196,22 +201,27 @@
         throw new Error('فایل VAD خالی است');
       }
 
+      console.log(`تعداد سطرهای فایل VAD: ${rows.length}`);
+      
       // Parse header
       const header = rows[0].map(h => h.toLowerCase().trim());
       const hMap = headerIndexMap(header);
+      
+      console.log('ستون‌های فایل VAD:', header.join(', '));
       
       const wordIdx = pickIndex(hMap, ['word', 'token', 'کلمه']);
       const valIdx = pickIndex(hMap, ['valence', 'val', 'ارزش']);
       const aroIdx = pickIndex(hMap, ['arousal', 'aro', 'برانگیختگی']);
       const domIdx = pickIndex(hMap, ['dominance', 'dom', 'سلطه']);
       const conIdx = pickIndex(hMap, ['concreteness', 'con', 'عینیت']);
-      const srcIdx = pickIndex(hMap, ['source', 'منبع']);
+      const srcIdx = pickIndex(hMap, ['source', 'affect_source', 'منبع']);
       
       if (wordIdx < 0) {
-        throw new Error('ستون کلمه در فایل VAD یافت نشد');
+        throw new Error('ستون کلمه در فایل VAD یافت نشد. ستون‌های موجود: ' + header.join(', '));
       }
 
       // Process data rows
+      let loaded = 0;
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (row.length <= wordIdx) continue;
@@ -233,9 +243,10 @@
             vadMap.set(k, data);
           }
         }
+        loaded++;
       }
       
-      console.log(`بارگذاری ${vadMap.size} ورودی VAD انجام شد`);
+      console.log(`✓ ${loaded} واژه VAD بارگذاری شد (${vadMap.size} کلید)`);
     } catch (error) {
       console.error('خطا در بارگذاری VAD:', error);
       throw error;
@@ -301,13 +312,16 @@
   // ---------- Init ----------
   async function init() {
     setStatus("در حال بارگذاری داده‌ها...");
+    console.log('شروع بارگذاری داده‌ها...');
     
     try {
       await Promise.all([loadFrequency(), loadVAD()]);
       setStatus("آماده ✅");
+      console.log('بارگذاری کامل شد!');
     } catch (e) {
-      console.error(e);
-      setStatus("خطا در بارگذاری داده‌ها");
+      console.error('خطای اصلی:', e);
+      setStatus("خطا در بارگذاری داده‌ها: " + e.message);
+      alert('خطا در بارگذاری داده‌ها. لطفاً console را بررسی کنید.');
     }
   }
 
