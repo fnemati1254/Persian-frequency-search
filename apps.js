@@ -1,23 +1,27 @@
 (() => {
   "use strict";
 
-  /* ===================== DOM ===================== */
+  /* =========================
+     DOM
+  ========================= */
   const $ = (id) => document.getElementById(id);
 
-  /* ===================== Normalization ===================== */
+  /* =========================
+     Normalization (does NOT touch ئ)
+  ========================= */
   const ZWNJ = "\u200c";
   const ARABIC_DIACRITICS = /[\u064B-\u065F\u0670\u06D6-\u06ED]/g;
 
   function normalizePersian(s) {
-    if (!s) return "";
+    if (s == null) return "";
     s = String(s);
 
     s = s.replace(/\u00A0/g, " ");
     s = s.replace(/\s+/g, " ").trim();
 
-    // فقط عربی → فارسی (نه ئ)
+    // Arabic → Persian (NO conversion of ئ)
     s = s.replace(/ي/g, "ی").replace(/ك/g, "ک");
-    s = s.replace(/ۀ|ة/g, "ه");
+    s = s.replace(/ۀ/g, "ه").replace(/ة/g, "ه");
     s = s.replace(/ؤ/g, "و").replace(/أ|إ|ٱ/g, "ا");
 
     s = s.replace(ARABIC_DIACRITICS, "");
@@ -26,146 +30,638 @@
     return s;
   }
 
-  /* ===================== Match keys ===================== */
-  function buildMatchKeys(w) {
-    const x = normalizePersian(w);
-    if (!x) return [];
+  /* =========================
+     Match keys (base)
+  ========================= */
+  function buildMatchKeys(rawWord) {
+    const w = normalizePersian(rawWord);
+    if (!w) return [];
 
-    const noSpace = x.replace(/\s+/g, "");
-    const noZwnj = x.replaceAll(ZWNJ, "");
-    const spaceToZwnj = x.replace(/\s+/g, ZWNJ);
+    const noSpaces = w.replace(/\s+/g, "");
+    const noZwnj = w.replaceAll(ZWNJ, "");
+    const noSpaceNoZwnj = noSpaces.replaceAll(ZWNJ, "");
+    const spaceToZwnj = w.replace(/\s+/g, ZWNJ);
 
-    const a2a = s => s.replace(/آ/g, "ا");
+    const a2alef = (x) => x.replace(/آ/g, "ا");
+    const alef2a = (x) => x.replace(/\bا/g, "آ"); // conservative
 
-    return [...new Set([
-      x,
-      noSpace,
-      noZwnj,
-      spaceToZwnj,
-      a2a(x),
-      a2a(noSpace),
-      a2a(noZwnj)
-    ])];
+    const base = [w, noSpaces, noZwnj, noSpaceNoZwnj, spaceToZwnj];
+    const extra = [];
+    for (const b of base) {
+      extra.push(a2alef(b));
+      extra.push(alef2a(b));
+    }
+
+    return [...new Set([...base, ...extra].map(x => x.trim()).filter(Boolean))];
   }
 
-  /* ===================== STRICT fallback rules ===================== */
-  function yehSeqToHamza(w) {
+  // Fast keys (batch list/file)
+  function buildMatchKeysFast(wNorm) {
+    const noSpaces = wNorm.replace(/\s+/g, "");
+    const noZwnj = wNorm.replaceAll(ZWNJ, "");
+    const a2alef = (x) => x.replace(/آ/g, "ا");
+    return [...new Set([wNorm, noSpaces, noZwnj, a2alef(wNorm), a2alef(noSpaces), a2alef(noZwnj)])];
+  }
+
+  /* =========================
+     STRICT rescue rules (frequency only)
+     Applied ONLY after base match fails
+  ========================= */
+
+  // Rule A: If "یی" occurs (NOT word-initial), change first ی → ئ : "یی" -> "ئی"
+  function yehSequenceToHamza(w) {
+    if (typeof w !== "string") return null;
     const i = w.indexOf("یی");
-    return (i > 0) ? w.slice(0, i) + "ئی" + w.slice(i + 2) : null;
+    if (i <= 0) return null; // must exist and NOT be word-initial
+    return w.slice(0, i) + "ئی" + w.slice(i + 2);
   }
 
+  // Rule B: If exactly one "ی" exists AND it's strictly medial (not first/last), change it to "ئ"
   function singleMedialYehToHamza(w) {
-    const pos = [...w].map((c, i) => c === "ی" ? i : -1).filter(i => i >= 0);
+    if (typeof w !== "string") return null;
+    const chars = [...w];
+    const pos = [];
+    for (let i = 0; i < chars.length; i++) if (chars[i] === "ی") pos.push(i);
     if (pos.length !== 1) return null;
     const i = pos[0];
-    if (i === 0 || i === w.length - 1) return null;
-    return w.slice(0, i) + "ئ" + w.slice(i + 1);
+    if (i === 0 || i === chars.length - 1) return null;
+    const out = chars.slice();
+    out[i] = "ئ";
+    return out.join("");
   }
 
-  /* ===================== Parsers ===================== */
-  const parseTSV = t => t.replace(/\r/g, "").split("\n").filter(Boolean).map(l => l.split("\t"));
-  const parseCSV = t => t.replace(/\r/g, "").split("\n").map(r => r.split(","));
+  // Independent reverse rule (requested): exactly one medial "ئ" -> "ی"
+  function singleMedialHamzaToYeh(w) {
+    if (typeof w !== "string") return null;
+    const chars = [...w];
+    const pos = [];
+    for (let i = 0; i < chars.length; i++) if (chars[i] === "ئ") pos.push(i);
+    if (pos.length !== 1) return null;
+    const i = pos[0];
+    if (i === 0 || i === chars.length - 1) return null;
+    const out = chars.slice();
+    out[i] = "ی";
+    return out.join("");
+  }
 
-  /* ===================== Data stores ===================== */
-  const freqMap = new Map();
-  const freqBuckets = new Map();
+  // Reverse sequence rule: "ئی" -> "یی" (NOT word-initial)
+  function hamzaSequenceToYeh(w) {
+    if (typeof w !== "string") return null;
+    const i = w.indexOf("ئی");
+    if (i <= 0) return null;
+    return w.slice(0, i) + "یی" + w.slice(i + 2);
+  }
 
-  /* ===================== Helpers ===================== */
-  const bucketKey = w => w ? w[0] : "#";
-  const addBucket = (b, w) => {
-    const k = bucketKey(w);
-    if (!b.has(k)) b.set(k, []);
-    b.get(k).push(w);
-  };
+  /* =========================
+     Parsers
+  ========================= */
+  function parseTSV(text) {
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const lines = text.split("\n").filter(l => l.trim().length > 0);
+    return lines.map(l => l.split("\t"));
+  }
 
-  /* ===================== Load frequency ===================== */
+  function parseCSV(text) {
+    // Simple CSV (good enough for your current vad_data.csv if no complex quoted commas)
+    text = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const lines = text.split("\n").filter(l => l.trim().length > 0);
+    return lines.map(l => {
+      // minimal quote handling
+      const out = [];
+      let cur = "", inQ = false;
+      for (let i = 0; i < l.length; i++) {
+        const c = l[i];
+        if (c === '"' && l[i + 1] === '"') { cur += '"'; i++; continue; }
+        if (c === '"') { inQ = !inQ; continue; }
+        if (c === "," && !inQ) { out.push(cur); cur = ""; continue; }
+        cur += c;
+      }
+      out.push(cur);
+      return out;
+    });
+  }
+
+  function headerIndexMap(headerRow) {
+    const m = new Map();
+    headerRow.forEach((h, idx) => m.set(String(h).trim().toLowerCase(), idx));
+    return m;
+  }
+
+  function pickIndex(map, candidates) {
+    for (const c of candidates) {
+      const k = c.toLowerCase();
+      if (map.has(k)) return map.get(k);
+    }
+    return -1;
+  }
+
+  /* =========================
+     Stores
+  ========================= */
+  let freqMap = new Map();   // key -> {word, perMillion, zipf}
+  let vadMap  = new Map();   // key -> {source,valence,arousal,dominance,concreteness}
+
+  let freqBuckets = new Map(); // first char -> [words]
+  let vadBuckets  = new Map();
+
+  let lastResults = [];
+  let displayLimit = 10;
+
+  /* =========================
+     Buckets
+  ========================= */
+  function bucketKey(word) {
+    const w = normalizePersian(word);
+    if (!w) return "#";
+    return w[0];
+  }
+
+  function addToBucket(buckets, word) {
+    const k = bucketKey(word);
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(word);
+  }
+
+  /* =========================
+     UI
+  ========================= */
+  function setStatus(msg) {
+    const el = $("status");
+    if (el) el.textContent = msg;
+  }
+
+  function getSelectedAffectCols() {
+    const checks = document.querySelectorAll(".affectChk");
+    const selected = [];
+    checks.forEach(chk => { if (chk.checked) selected.push(chk.value); });
+    return selected;
+  }
+
+  function fmtNum(x, digits = 3) {
+    if (x == null || x === "" || Number.isNaN(x)) return "—";
+    const n = Number(x);
+    if (!Number.isFinite(n)) return "—";
+    return n.toFixed(digits);
+  }
+
+  function renderTable() {
+    const head = $("resultsHead");
+    const body = $("resultsBody");
+    const btnMore = $("btnShowMore");
+    const btnDl = $("btnDownload");
+
+    if (!head || !body) return;
+
+    const affectCols = getSelectedAffectCols();
+
+    const cols = [
+      { key: "word", label: "واژه" },
+      { key: "perMillion", label: "بسامد در میلیون (Per Million)" },
+      { key: "zipf", label: "زیف (Zipf)" },
+      ...affectCols.map(c => ({
+        key: c,
+        label: c === "valence" ? "Valence (خوشایندی)" :
+               c === "arousal" ? "Arousal (هیجان)" :
+               c === "dominance" ? "Dominance (سلطه)" :
+               c === "concreteness" ? "Concreteness (عینیت)" :
+               c
+      })),
+      { key: "affectSource", label: "Affect_Source" }
+    ];
+
+    head.innerHTML = "<tr>" + cols.map(c => `<th>${c.label}</th>`).join("") + "</tr>";
+
+    const show = lastResults.slice(0, displayLimit);
+    body.innerHTML = "";
+
+    for (const r of show) {
+      const tds = [];
+      tds.push(`<td class="word">${r.word ?? "—"}</td>`);
+      tds.push(`<td>${fmtNum(r.perMillion, 3)}</td>`);
+      tds.push(`<td>${fmtNum(r.zipf, 3)}</td>`);
+      for (const c of affectCols) tds.push(`<td>${fmtNum(r[c], 6)}</td>`);
+      tds.push(`<td>${r.affectSource ?? "—"}</td>`);
+      body.innerHTML += `<tr>${tds.join("")}</tr>`;
+    }
+
+    if (btnMore) btnMore.disabled = !(lastResults.length > displayLimit);
+    if (btnDl) btnDl.disabled = !(lastResults.length > 0);
+  }
+
+  function setResults(rows) {
+    lastResults = rows || [];
+    displayLimit = 10;
+    renderTable();
+  }
+
+  /* =========================
+     Lookup (base first, then strict rescue for FREQUENCY only)
+  ========================= */
+  function lookupOne(wordRaw) {
+    const keys = buildMatchKeys(wordRaw);
+    if (!keys.length) return null;
+
+    let freq = null;
+    let vad  = null;
+
+    // Base matching
+    for (const k of keys) {
+      if (!freq && freqMap.has(k)) freq = freqMap.get(k);
+      if (!vad  && vadMap.has(k))  vad  = vadMap.get(k);
+      if (freq && vad) break;
+    }
+
+    // STRICT rescue (FREQUENCY ONLY) — only if freq not found
+    if (!freq) {
+      const norm = normalizePersian(wordRaw);
+      const tries = [
+        yehSequenceToHamza(norm),
+        singleMedialYehToHamza(norm),
+        singleMedialHamzaToYeh(norm),
+        hamzaSequenceToYeh(norm)
+      ];
+      for (const t of tries) {
+        if (t && freqMap.has(t)) { freq = freqMap.get(t); break; }
+      }
+    }
+
+    const label = normalizePersian(wordRaw) || wordRaw;
+
+    return {
+      word: label,
+      perMillion: freq?.perMillion ?? null,
+      zipf: freq?.zipf ?? null,
+      valence: vad?.valence ?? null,
+      arousal: vad?.arousal ?? null,
+      dominance: vad?.dominance ?? null,
+      concreteness: vad?.concreteness ?? null,
+      affectSource: vad?.source ?? null,
+      _hasAny: !!(freq || vad)
+    };
+  }
+
+  function lookupOneNormalizedFast(wNorm) {
+    let freq = null, vad = null;
+
+    // Base fast
+    for (const k of buildMatchKeysFast(wNorm)) {
+      if (!freq && freqMap.has(k)) freq = freqMap.get(k);
+      if (!vad  && vadMap.has(k))  vad  = vadMap.get(k);
+      if (freq && vad) break;
+    }
+
+    // STRICT rescue (FREQUENCY ONLY)
+    if (!freq) {
+      const tries = [
+        yehSequenceToHamza(wNorm),
+        singleMedialYehToHamza(wNorm),
+        singleMedialHamzaToYeh(wNorm),
+        hamzaSequenceToYeh(wNorm)
+      ];
+      for (const t of tries) {
+        if (t && freqMap.has(t)) { freq = freqMap.get(t); break; }
+      }
+    }
+
+    return {
+      word: wNorm,
+      perMillion: freq?.perMillion ?? null,
+      zipf: freq?.zipf ?? null,
+      valence: vad?.valence ?? null,
+      arousal: vad?.arousal ?? null,
+      dominance: vad?.dominance ?? null,
+      concreteness: vad?.concreteness ?? null,
+      affectSource: vad?.source ?? null,
+      _hasAny: !!(freq || vad)
+    };
+  }
+
+  /* =========================
+     Search (uses buckets for speed)
+  ========================= */
+  function searchWords(query) {
+    const q = normalizePersian(query);
+    if (!q) return [];
+
+    const qKeys = buildMatchKeys(q);
+    const qCompact = q.replace(/\s+/g, "").replaceAll(ZWNJ, "");
+
+    const bKey = bucketKey(q);
+    const pool = [
+      ...(freqBuckets.get(bKey) || []),
+      ...(vadBuckets.get(bKey) || [])
+    ];
+
+    const candidatesPool = pool.length ? pool : [
+      ...Array.from(freqBuckets.values()).flat(),
+      ...Array.from(vadBuckets.values()).flat()
+    ];
+
+    const WANT = 300;
+    const out = [];
+    const seen = new Set();
+
+    function rank(w) {
+      const wn = normalizePersian(w);
+      const exact = (wn === q || wn === qCompact) ? 3 : 0;
+      const starts = (wn.startsWith(q) || wn.startsWith(qCompact)) ? 2 : 0;
+      const inc = (wn.includes(q) || wn.includes(qCompact)) ? 1 : 0;
+      return exact * 100 + starts * 10 + inc;
+    }
+
+    for (const w of candidatesPool) {
+      const wn = normalizePersian(w);
+      if (!wn) continue;
+
+      let ok = false;
+      for (const k of qKeys) {
+        if (wn === k || wn.startsWith(k) || wn.includes(k)) { ok = true; break; }
+      }
+      if (!ok && (wn.startsWith(q) || wn.includes(q) || wn.startsWith(qCompact) || wn.includes(qCompact))) ok = true;
+      if (!ok) continue;
+
+      if (seen.has(wn)) continue;
+      seen.add(wn);
+
+      const row = lookupOne(wn);
+      if (row && row._hasAny) out.push(row);
+
+      if (out.length >= WANT) break;
+    }
+
+    out.sort((a, b) => {
+      const ra = rank(a.word);
+      const rb = rank(b.word);
+      if (rb !== ra) return rb - ra;
+      const za = (typeof a.zipf === "number") ? a.zipf : -999;
+      const zb = (typeof b.zipf === "number") ? b.zipf : -999;
+      return zb - za;
+    });
+
+    return out;
+  }
+
+  /* =========================
+     CSV download (UTF-8 BOM)
+  ========================= */
+  function toCSV(rows) {
+    const affectCols = getSelectedAffectCols();
+    const headers = ["word", "per_million", "zipf", ...affectCols, "Affect_Source"];
+
+    const escape = (v) => {
+      if (v == null) return "";
+      const s = String(v);
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+
+    const lines = [];
+    lines.push(headers.join(","));
+    for (const r of rows) {
+      const line = [
+        r.word ?? "",
+        r.perMillion ?? "",
+        r.zipf ?? "",
+        ...affectCols.map(c => (r[c] ?? "")),
+        r.affectSource ?? ""
+      ].map(escape).join(",");
+      lines.push(line);
+    }
+
+    return "\uFEFF" + lines.join("\n");
+  }
+
+  function downloadCSV() {
+    const csv = toCSV(lastResults);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "persian_lexical_characteristics_output.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+  }
+
+  /* =========================
+     Load datasets (robust + status)
+  ========================= */
   async function loadFrequency() {
-    const text = await (await fetch("word_frequencies_public.tsv", { cache: "no-store" })).text();
+    const res = await fetch("word_frequencies_public.tsv", { cache: "no-store" });
+    if (!res.ok) throw new Error("Cannot load word_frequencies_public.tsv (HTTP " + res.status + ")");
+    const text = await res.text();
     const rows = parseTSV(text);
-    const hasHeader = isNaN(Number(rows[0][1]));
-    const data = hasHeader ? rows.slice(1) : rows;
 
-    for (const r of data) {
-      const w = normalizePersian(r[0]);
-      const pm = Number(r[1]);
-      const z = r[2] ? Number(r[2]) : null;
-      if (!w || !Number.isFinite(pm)) continue;
+    const header = rows[0] || [];
+    const map = headerIndexMap(header);
+    const iWord = pickIndex(map, ["word", "token", "w"]) >= 0 ? pickIndex(map, ["word", "token", "w"]) : 0;
+    const iPerM = pickIndex(map, ["per_million", "permillion", "per million"]) >= 0 ? pickIndex(map, ["per_million", "permillion", "per million"]) : 1;
+    const iZipf = pickIndex(map, ["zipf"]) >= 0 ? pickIndex(map, ["zipf"]) : 2;
 
-      const rec = { perMillion: pm, zipf: z };
-      addBucket(freqBuckets, w);
-      for (const k of buildMatchKeys(w)) {
+    freqMap = new Map();
+    freqBuckets = new Map();
+
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const wRaw = row[iWord];
+      if (!wRaw) continue;
+
+      const wNorm = normalizePersian(wRaw);
+      if (!wNorm) continue;
+
+      const perM = Number(row[iPerM]);
+      const zipf = Number(row[iZipf]);
+
+      const rec = {
+        word: wNorm,
+        perMillion: Number.isFinite(perM) ? perM : null,
+        zipf: Number.isFinite(zipf) ? zipf : null
+      };
+
+      addToBucket(freqBuckets, wNorm);
+
+      for (const k of buildMatchKeys(wNorm)) {
         if (!freqMap.has(k)) freqMap.set(k, rec);
       }
     }
   }
 
-  /* ===================== Lookup ===================== */
-  function lookupFrequency(word) {
-    const norm = normalizePersian(word);
+  async function loadVAD() {
+    const res = await fetch("vad_data.csv", { cache: "no-store" });
+    if (!res.ok) throw new Error("Cannot load vad_data.csv (HTTP " + res.status + ")");
+    const text = await res.text();
+    const rows = parseCSV(text);
 
-    for (const k of buildMatchKeys(norm)) {
-      if (freqMap.has(k)) return freqMap.get(k);
+    const header = (rows[0] || []).map(h => String(h).trim());
+    const map = headerIndexMap(header);
+
+    const iWord = pickIndex(map, ["word"]);
+    const iDataset = pickIndex(map, ["dataset"]);
+    const iV = pickIndex(map, ["valence"]);
+    const iA = pickIndex(map, ["arousal"]);
+    const iD = pickIndex(map, ["dominance"]);
+    const iC = pickIndex(map, ["concreteness"]);
+    const iEV = pickIndex(map, ["ebw_valence"]);
+    const iEA = pickIndex(map, ["ebw_arousal"]);
+    const iED = pickIndex(map, ["ebw_dominance"]);
+    const iEC = pickIndex(map, ["ebw_concreteness"]);
+
+    if (iWord < 0) throw new Error("VAD CSV: header 'word' not found.");
+    if (iDataset < 0) throw new Error("VAD CSV: header 'dataset' not found.");
+
+    vadMap = new Map();
+    vadBuckets = new Map();
+
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const wRaw = row[iWord];
+      if (!wRaw) continue;
+
+      const wNorm = normalizePersian(wRaw);
+      if (!wNorm) continue;
+
+      const dataset = (row[iDataset] ?? "").trim().toUpperCase();
+      const isExtrap = dataset === "XXX";
+
+      let val, aro, dom, con;
+      if (isExtrap) {
+        val = Number(row[iEV]);
+        aro = Number(row[iEA]);
+        dom = Number(row[iED]);
+        con = Number(row[iEC]);
+      } else {
+        val = Number(row[iV]);
+        aro = Number(row[iA]);
+        dom = Number(row[iD]);
+        con = Number(row[iC]);
+      }
+
+      const rec = {
+        source: isExtrap ? "Predicted" : "Human",
+        valence: Number.isFinite(val) ? val : null,
+        arousal: Number.isFinite(aro) ? aro : null,
+        dominance: Number.isFinite(dom) ? dom : null,
+        concreteness: Number.isFinite(con) ? con : null
+      };
+
+      addToBucket(vadBuckets, wNorm);
+
+      for (const k of buildMatchKeys(wNorm)) {
+        if (!vadMap.has(k)) vadMap.set(k, rec);
+      }
     }
-
-    const tries = [
-      yehSeqToHamza(norm),
-      singleMedialYehToHamza(norm)
-    ];
-
-    for (const t of tries) {
-      if (t && freqMap.has(t)) return freqMap.get(t);
-    }
-    return null;
   }
 
-  /* ===================== SEARCH ===================== */
-  function searchWords(q) {
-    const query = normalizePersian(q);
-    if (!query) return [];
-
-    const pool = freqBuckets.get(bucketKey(query)) || [];
-    const out = [];
-
-    for (const w of pool) {
-      if (!w.includes(query)) continue;
-      const f = lookupFrequency(w);
-      if (f) out.push({ word: w, ...f });
-    }
-    return out;
-  }
-
-  /* ===================== Render ===================== */
-  function render(rows) {
-    const body = $("resultsBody");
-    if (!body) return;
-    body.innerHTML = "";
-    for (const r of rows) {
-      body.innerHTML += `
-        <tr>
-          <td>${r.word}</td>
-          <td>${r.perMillion?.toFixed(3) ?? "—"}</td>
-          <td>${r.zipf?.toFixed(3) ?? "—"}</td>
-        </tr>`;
-    }
-  }
-
-  /* ===================== INIT ===================== */
+  /* =========================
+     Init / Events (THIS is what your current broken file missed)
+  ========================= */
   async function init() {
-    const input = $("searchInput");
-    const status = $("status");
+    const searchInput = $("searchInput");
+    const btnMore = $("btnShowMore");
+    const btnDl = $("btnDownload");
+    const listInput = $("listInput");
+    const fileInput = $("fileInput");
+    const btnAnalyze = $("btnAnalyze");
+    const head = $("resultsHead");
+    const body = $("resultsBody");
 
-    status.textContent = "در حال بارگذاری…";
-    await loadFrequency();
-    status.textContent = "آماده ✅";
+    if (!searchInput || !btnMore || !btnDl || !listInput || !fileInput || !btnAnalyze || !head || !body) {
+      console.error("Missing required element IDs in index.html.");
+      console.error({ searchInput, btnMore, btnDl, listInput, fileInput, btnAnalyze, head, body });
+      setStatus("خطا: بعضی IDها در index.html پیدا نشد.");
+      return;
+    }
 
-    let t;
-    input.addEventListener("input", () => {
+    document.querySelectorAll(".affectChk").forEach(chk => {
+      chk.addEventListener("change", () => renderTable());
+    });
+
+    // Live search typing
+    let t = null;
+    searchInput.addEventListener("input", () => {
       clearTimeout(t);
       t = setTimeout(() => {
-        const r = searchWords(input.value);
-        render(r);
-      }, 120);
+        const q = searchInput.value;
+        if (!normalizePersian(q)) {
+          setResults([]);
+          setStatus("آماده.");
+          return;
+        }
+        const rows = searchWords(q);
+        setResults(rows);
+        setStatus(`نتایج برای «${normalizePersian(q)}»: ${rows.length} مورد`);
+      }, 150);
     });
+
+    btnMore.addEventListener("click", () => {
+      displayLimit += 20;
+      renderTable();
+    });
+
+    btnDl.addEventListener("click", () => downloadCSV());
+
+    // Analyze list/file
+    btnAnalyze.addEventListener("click", async () => {
+      const textAreaWords = listInput.value || "";
+      const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+      let content = textAreaWords;
+
+      if (file) {
+        const fileText = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("FileReader failed"));
+          reader.readAsText(file, "utf-8");
+        });
+        content = (content ? content + "\n" : "") + fileText;
+      }
+
+      const words = content
+        .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+        .split("\n")
+        .map(x => normalizePersian(x))
+        .filter(x => x.length > 0);
+
+      if (!words.length) {
+        setResults([]);
+        setStatus("هیچ واژه‌ای در لیست/فایل پیدا نشد.");
+        return;
+      }
+
+      const rows = [];
+      const seen = new Set();
+
+      for (const wNorm of words) {
+        if (seen.has(wNorm)) continue;
+        seen.add(wNorm);
+
+        const r = lookupOneNormalizedFast(wNorm);
+        if (r && r._hasAny) rows.push(r);
+        else rows.push({
+          word: wNorm,
+          perMillion: null, zipf: null,
+          valence: null, arousal: null, dominance: null, concreteness: null,
+          affectSource: null
+        });
+      }
+
+      setResults(rows);
+      setStatus(`تحلیل انجام شد: ${rows.length} واژه (آخرین نتایج نمایش داده می‌شود).`);
+    });
+
+    // Load data
+    try {
+      setStatus("در حال بارگذاری داده‌ها…");
+      await Promise.all([loadFrequency(), loadVAD()]);
+      setStatus(`آماده ✅`);
+    } catch (e) {
+      console.error(e);
+      setStatus("خطا در بارگذاری داده‌ها. (Console را بررسی کنید)");
+    }
   }
 
   document.addEventListener("DOMContentLoaded", init);
