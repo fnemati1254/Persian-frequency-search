@@ -122,6 +122,126 @@
   let freqBuckets = new Map(), vadBuckets = new Map();
   let lastResults = [], displayLimit = 10;
 
+  // ---------- Status Display ----------
+  function setStatus(message) {
+    const statusElement = $('status');
+    if (statusElement) {
+      statusElement.textContent = message;
+    } else {
+      console.log('Status:', message);
+    }
+  }
+
+  // ---------- Load Frequency Data ----------
+  async function loadFrequency() {
+    setStatus("در حال بارگذاری داده‌های فرکانس...");
+    
+    try {
+      const response = await fetch('persian_frequency.tsv'); // Adjust path as needed
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const text = await response.text();
+      const rows = parseTSV(text);
+      
+      if (rows.length === 0) {
+        throw new Error('فایل فرکانس خالی است');
+      }
+
+      // Process rows (skip header if exists)
+      const hasHeader = isNaN(parseFloat(rows[0][1]));
+      const dataRows = hasHeader ? rows.slice(1) : rows;
+      
+      for (const row of dataRows) {
+        if (row.length < 2) continue;
+        
+        const word = normalizePersian(row[0]);
+        const perMillion = parseFloat(row[1]);
+        const zipf = row[2] ? parseFloat(row[2]) : null;
+        
+        if (word && !isNaN(perMillion)) {
+          const keys = buildMatchKeys(word);
+          const data = { perMillion, zipf };
+          
+          for (const k of keys) {
+            if (!freqMap.has(k)) {
+              freqMap.set(k, data);
+            }
+          }
+        }
+      }
+      
+      console.log(`بارگذاری ${freqMap.size} ورودی فرکانس انجام شد`);
+    } catch (error) {
+      console.error('خطا در بارگذاری فرکانس:', error);
+      throw error;
+    }
+  }
+
+  // ---------- Load VAD Data ----------
+  async function loadVAD() {
+    setStatus("در حال بارگذاری داده‌های VAD...");
+    
+    try {
+      const response = await fetch('persian_vad.csv'); // Adjust path as needed
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const text = await response.text();
+      const rows = parseCSV(text);
+      
+      if (rows.length === 0) {
+        throw new Error('فایل VAD خالی است');
+      }
+
+      // Parse header
+      const header = rows[0].map(h => h.toLowerCase().trim());
+      const hMap = headerIndexMap(header);
+      
+      const wordIdx = pickIndex(hMap, ['word', 'token', 'کلمه']);
+      const valIdx = pickIndex(hMap, ['valence', 'val', 'ارزش']);
+      const aroIdx = pickIndex(hMap, ['arousal', 'aro', 'برانگیختگی']);
+      const domIdx = pickIndex(hMap, ['dominance', 'dom', 'سلطه']);
+      const conIdx = pickIndex(hMap, ['concreteness', 'con', 'عینیت']);
+      const srcIdx = pickIndex(hMap, ['source', 'منبع']);
+      
+      if (wordIdx < 0) {
+        throw new Error('ستون کلمه در فایل VAD یافت نشد');
+      }
+
+      // Process data rows
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length <= wordIdx) continue;
+        
+        const word = normalizePersian(row[wordIdx]);
+        if (!word) continue;
+        
+        const data = {
+          valence: valIdx >= 0 && row[valIdx] ? parseFloat(row[valIdx]) : null,
+          arousal: aroIdx >= 0 && row[aroIdx] ? parseFloat(row[aroIdx]) : null,
+          dominance: domIdx >= 0 && row[domIdx] ? parseFloat(row[domIdx]) : null,
+          concreteness: conIdx >= 0 && row[conIdx] ? parseFloat(row[conIdx]) : null,
+          source: srcIdx >= 0 ? row[srcIdx] : null
+        };
+        
+        const keys = buildMatchKeys(word);
+        for (const k of keys) {
+          if (!vadMap.has(k)) {
+            vadMap.set(k, data);
+          }
+        }
+      }
+      
+      console.log(`بارگذاری ${vadMap.size} ورودی VAD انجام شد`);
+    } catch (error) {
+      console.error('خطا در بارگذاری VAD:', error);
+      throw error;
+    }
+  }
+
   // ---------- Lookup ----------
   function lookupOne(wordRaw) {
     const keys = buildMatchKeys(wordRaw);
@@ -180,6 +300,8 @@
 
   // ---------- Init ----------
   async function init() {
+    setStatus("در حال بارگذاری داده‌ها...");
+    
     try {
       await Promise.all([loadFrequency(), loadVAD()]);
       setStatus("آماده ✅");
@@ -188,6 +310,14 @@
       setStatus("خطا در بارگذاری داده‌ها");
     }
   }
+
+  // ---------- Export for global access ----------
+  window.PersianFrequency = {
+    lookupOne,
+    lookupOneNormalizedFast,
+    normalizePersian,
+    init
+  };
 
   document.addEventListener("DOMContentLoaded", init);
 })();
